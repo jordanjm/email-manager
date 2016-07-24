@@ -160,64 +160,50 @@ sub displayDBtable
 #	Forwarders: INSERT INTO forwardings VALUES("$newEmailAddress", "$newForwardToAddress")
 sub addToTable
 {
-	my $tableName = @_[0];
 	my @dbConnect = dbInfo();
-	my $newDomain='';
-	my $newEmailAddress='';
-	my $newEmailPassword='';
-	my $newForwardToAddress='';
+	my $tableName = @_[0];
+	my $newVal1='';
+	my $newVal2='';
+	my $sql;
+	my @dbTable = getDBtable(@dbConnect, $tableName); 
+	my $columnName = shift @dbTable;
+	my $columnCount = scalar @$columnName;
+	#Take in the first (or only) value for adding entries to the database
+	print (colored("Enter the New ".ucfirst(@$columnName[0])." to Add.\n#", 'cyan'));
+	chomp($newVal1 = <STDIN>);
+	#If there is a second column (Password or actual email account, depending on if it is a forwarder or email account
+	if ($columnCount == 2)
+	{
+		print (colored("Enter the New ".ucfirst(@$columnName[1])." to Add.\n#", 'cyan'));
+		chomp($newVal2 = <STDIN>);
+	}
+	#Connect to the database
+	my $dbh = DBI->connect("DBI:mysql:$dbConnect[0]", "$dbConnect[1]", "$dbConnect[2]"                                                                                                                                         ) || die "Could Not Connect to Database: $DBI::errstr\n";
+	#Determine which query to run
 	given ( $tableName )
 	{
 		when("domains")		
 		{
-	                print (colored( "Enter the New Domain to Add.\n", 'cyan'));
-                	print (colored("#", 'cyan'));
-                	chomp($newDomain = <STDIN>);
-                	my $dbh = DBI->connect("DBI:mysql:$dbConnect[0]", "$dbConnect[1]", "$dbConnect[2]"                                                                                                                                         ) || die "Could Not Connect to Database: $DBI::errstr";
-                	my $sql = qq{ INSERT INTO domains (domain) VALUES ("$newDomain") };
-                	my $sth = $dbh->prepare( $sql );
-                	$sth->execute();
-                	#Finish with the query
-                        $sth->finish();
-                        #Disconnect from the database
-                        $dbh->disconnect();
+                	$sql = qq{ INSERT INTO $tableName (@$columnName[0]) VALUES ("$newVal1") };
 			break; 
 		}
-		when("email")
+		when("users")
 		{
-                	print (colored( "Enter the New Email Address.\n", 'cyan'));
-                	print (colored("#", 'cyan'));
-                	chomp($newEmailAddress = <STDIN>);
-                	print (colored( "Enter the Password.\n", 'cyan'));
-                	chomp($newEmailPassword = <STDIN>);
-                	my $dbh = DBI->connect("DBI:mysql:$dbConnect[0]", "$dbConnect[1]", "$dbConnect[2]"                                                                                                                                         ) || die "Could Not Connect to Database: $DBI::errstr";
-                	my $sql = qq{ INSERT INTO users (email, password) VALUES("$newEmailAddress", ENCRYPT("$newEmailPassword")) };
-                	my $sth = $dbh->prepare( $sql );
-                	$sth->execute();
-                	#Finish with the query
-                        $sth->finish();
-                        #Disconnect from the database
-                        $dbh->disconnect();
+                	$sql = qq{ INSERT INTO $tableName VALUES("$newVal1", ENCRYPT("$newVal2")) };
 			break; 
 		}
-		when("forwarders")
+		when("forwardings")
 		{ 
-	                print (colored( "Enter the New Email Address.\n", 'cyan'));
-                	print (colored("#", 'cyan'));
-        	        chomp($newEmailAddress = <STDIN>);
-                	print (colored( "Enter Address To Forward to.\n", 'cyan'));
-	                chomp($newForwardToAddress = <STDIN>);
-        	        my $dbh = DBI->connect("DBI:mysql:$dbConnect[0]", "$dbConnect[1]", "$dbConnect[2]"                                                                                                                                         ) || die "Could Not Connect to Database: $DBI::errstr";
-                	my $sql = qq{ INSERT INTO forwardings VALUES("$newEmailAddress", "$newForwardToAddress")  };
-	                my $sth = $dbh->prepare( $sql );
-        	        $sth->execute();
-                	#Finish with the query
-                	$sth->finish();
-                        #Disconnect from the database
-                        $dbh->disconnect();
+                	$sql = qq{ INSERT INTO $tableName VALUES("$newVal1", "$newVal2")  };
 			break; 
 		}
 	}
+	#Close Prepare, execute, and finish the query.  Then disconnect from the database
+	my $sth = $dbh->prepare( $sql );
+	$sth->execute();
+	$sth->finish();
+	$dbh->disconnect();
+	#Wait for a keypress before continuing. 
 	waitForIt();
 }
 
@@ -238,7 +224,7 @@ sub removeFromTable
 	my $inputItem = 0;
 	my $key;
 	my $value;
-	#Retrieve the table name
+	#Retrieve the main column name
 	my $columnName = shift @dbTable;
 	$columnName = "@$columnName[0]";
 	#Create a menu of items that can be  deleted
@@ -489,7 +475,7 @@ sub editEmail
                 }
                 given ($choice)
                 {
-                	when(1)         { addToTable("email"); break; } #Add a Domain
+                	when(1)         { addToTable("users"); break; } #Add a Domain
                         when(2)         { removeFromTable("users");  break; } #Delete a Domain
                         when(3)         { editTable("users"); break; } #Edit a Domain
                         when(4)         { mainMenu(); break; } #Return to the Main Menu
@@ -529,7 +515,7 @@ sub editForwarders
 		}
                 given ($choice)
                 {
-                	when(1)         { addToTable("forwarders"); break; } #Add a Domain
+                	when(1)         { addToTable("forwardings"); break; } #Add a Domain
                         when(2)         { removeFromTable("forwardings"); break; } #Delete a Domain
                         when(3)         { editTable("forwardings"); break; } #Edit a Domain
                         when(4)         { mainMenu(); break; } #Return to the Main Menu
@@ -581,4 +567,4 @@ sub mainMenu
 	}
 }
 
-mainMenu();
+mainMenu() || die;
